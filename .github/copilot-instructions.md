@@ -5,6 +5,13 @@ This is a PlatformIO-based ESP32 project for the TTGO T18 V3 board featuring two
 1. **VL53L0X Time-of-Flight distance sensor** (I2C) - Controls LED #1 brightness based on distance
 2. **LD2410C human presence sensor** (UART) - Controls Servo and LED #2 based on presence
 
+### LD2410C Timing Sequence
+**Detection (13 seconds total):**
+- 2s debounce → 5s transition ON (servo/LED) → 6s active wait
+
+**Departure (13 seconds total):**
+- 2s debounce → 5s transition OFF (servo/LED) → 6s idle wait
+
 ## Board Configuration
 - **Custom Board Definition**: `boards/ttgo-t18-v3.json`
 - **Chipset**: ESP32-WROVER (240MHz dual-core, 520KB RAM, 4MB Flash)
@@ -28,8 +35,8 @@ This is a PlatformIO-based ESP32 project for the TTGO T18 V3 board featuring two
 
 ### LD2410C System
 - **LD2410C Presence Sensor**:
-  - RX: GPIO 12
-  - TX: GPIO 14
+  - RX: GPIO 32
+  - TX: GPIO 33
   - Baud: 256000
   - Detection Range: 1 meter threshold
   - Communication: UART2
@@ -52,7 +59,7 @@ This is a PlatformIO-based ESP32 project for the TTGO T18 V3 board featuring two
 - `updateVL53LED()` - Maps VL53L0X distance to LED #1 brightness with smooth transitions
 - `parseLD2410CData()` - Parses UART data frames from LD2410C sensor
 - `updateLD2410Outputs()` - Updates servo position and LED #2 brightness based on transition progress
-- `updateLD2410StateMachine()` - Manages 6-state state machine with debounce logic
+- `updateLD2410StateMachine()` - Manages 8-state state machine with timing logic
 - `setup()` - Initializes I2C, UART, servo, and both PWM channels
 - `loop()` - Continuous processing for both sensor systems
 
@@ -65,19 +72,19 @@ This is a PlatformIO-based ESP32 project for the TTGO T18 V3 board featuring two
 - Smooth brightness transitions (±5 per loop iteration)
 
 #### LD2410C System
-- **Detection Event** (human enters 1m range):
-  - Start 8-second debounce timer
-  - After debounce: Transition servo and LED #2 from 0 to max over 5 seconds
-- **Departure Event** (human leaves 1m range):
-  - Start 8-second debounce timer
-  - After debounce: Transition servo and LED #2 from max to 0 over 5 seconds
+- **Detection Sequence** (13 seconds total):
+  - 2-second debounce → 5-second transition ON → 6-second active wait
+- **Departure Sequence** (13 seconds total):
+  - 2-second debounce → 5-second transition OFF → 6-second idle wait
 - **State Machine States**:
-  - STATE_IDLE: No presence detected
-  - STATE_DEBOUNCE_ENTER: Debouncing after detection
-  - STATE_TRANSITIONING_ON: Fading in LED and moving servo (5 sec)
-  - STATE_ACTIVE: Presence detected, fully on
-  - STATE_DEBOUNCE_EXIT: Debouncing after departure
-  - STATE_TRANSITIONING_OFF: Fading out LED and returning servo (5 sec)
+  - STATE_IDLE: No presence detected, ready to detect
+  - STATE_DEBOUNCE_ENTER: 2-second debounce after detection
+  - STATE_TRANSITIONING_ON: 5-second gradual fade in LED and servo
+  - STATE_ACTIVE: Fully on, waiting before departure monitoring
+  - STATE_ACTIVE_WAIT: 6-second wait complete, monitoring for departure
+  - STATE_DEBOUNCE_EXIT: 2-second debounce after departure
+  - STATE_TRANSITIONING_OFF: 5-second gradual fade out LED and servo
+  - STATE_IDLE_WAIT: 6-second wait before ready to detect again
 
 ## Libraries Used
 - `Adafruit_VL53L0X` v1.2.4 - VL53L0X ToF sensor driver

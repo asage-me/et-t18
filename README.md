@@ -1,9 +1,15 @@
-# TTGO T18 ESP32 - Dual Sensor System
+# TTGO T18 ESP32 - VL53L0X Distance Sensor
 
 ## Project Overview
-This is a PlatformIO project featuring two independent sensor systems:
-1. **VL53L0X Distance Sensor** - Controls LED #1 brightness based on distance (closer = brighter)
-2. **LD2410C Human Presence Sensor** - Controls Servo and LED #2 based on presence within 1 meter, with smooth 5-second transitions and 8-second debounce timers
+This is a PlatformIO project featuring a VL53L0X Time-of-Flight distance sensor that controls LED brightness based on proximity. The closer an object is to the sensor, the brighter the LED becomes.
+
+### VL53L0X Features
+- **Distance Range**: 25mm (minimum/touch) to 1000mm (maximum)
+- **LED Control**: Inversely proportional brightness (closer = brighter)
+- **LED Brightness Range**: 3-125 (50% duty cycle = full brightness)
+- **Fast Fade Rate**: ±48 per loop = approximately 0.25 seconds for full fade
+- **Error Handling**: Returns maximum distance when no valid object detected
+- **Library**: VL53L0X_mod (schnoog's modified library with continuous mode)
 
 ## Hardware Components
 
@@ -33,69 +39,35 @@ This is a PlatformIO project featuring two independent sensor systems:
   - Accurate distance measurement up to 2 meters
   - 940nm VCSEL emitter
   - Operating voltage: 2.6V - 3.5V (module includes voltage regulator for 5V)
-  - Controls LED #1 on GPIO 25
-
-### LD2410C Human Presence Sensor
-- **Product Link**: [HLK-LD2410C](https://www.hlktech.net/index.php?id=1095)
-- **Description**: 24GHz millimeter-wave radar sensor for human presence detection
-- **Key Features**:
-  - UART communication interface (256000 baud)
-  - Detects static and moving targets
-  - Range: 0-6 meters (project uses 1m threshold)
-  - Low power consumption
-  - Operating voltage: 3.3V - 5V
-  - Controls Servo on GPIO 26 and LED #2 on GPIO 13
+  - Controls LED brightness on GPIO 25
+  - Project range: 25mm - 1000mm
+  - Continuous reading mode for faster response
 
 ## Project Plan
 
 ### Functionality
 
-#### VL53L0X System (LED #1)
-1. **Continuous Distance Measurement**: Reads distance via I2C
+#### VL53L0X Distance Sensor System
+1. **Continuous Distance Measurement**: Reads distance via I2C (GPIO 21/22)
 2. **LED Brightness Control**: Inversely proportional to distance
-   - 50mm or closer = Maximum brightness (255)
-   - 2000mm or farther = Minimum brightness (0)
+   - 25mm or closer = Maximum brightness (125)
+   - 1000mm or farther = Minimum brightness (3)
    - Linear mapping between these points
-3. **Smooth Transitions**: Gradual brightness changes
-
-#### LD2410C System (Servo + LED #2)
-1. **Human Detection**: Continuously monitors for human presence within 1 meter using UART
-2. **Detection Event** (human enters 1m range):
-   - 8 second debounce timer starts
-   - After debounce: Servo moves from 0° to 180° over 5 seconds
-   - After debounce: LED #2 fades from off to full brightness over 5 seconds
-3. **Departure Event** (human leaves 1m range):
-   - 8 second debounce timer starts
-   - After debounce: Servo returns from 180° to 0° over 5 seconds
-   - After debounce: LED #2 fades from full brightness to off over 5 seconds
-4. **Debounce Logic**: 8-second timers prevent false triggers from unstable readings at 1m boundary
+3. **Smooth Transitions**: Fast fade rate (±48 per loop = ~0.25 seconds full fade)
+4. **Error Handling**: Returns max distance when sensor reading is invalid
 
 ### Technical Implementation
-- **I2C Configuration**: Standard I2C for VL53L0X (GPIO 21/22)
-- **UART Configuration**: 256000 baud rate for LD2410C (GPIO 12/14)
-- **PWM Configuration**: 5kHz frequency, 8-bit resolution for both LEDs
-- **Servo Control**: ESP32Servo library, 0-180° range
-- **State Machine**: 6 states for LD2410C (IDLE, DEBOUNCE_ENTER, TRANSITIONING_ON, ACTIVE, DEBOUNCE_EXIT, TRANSITIONING_OFF)
+- **I2C Configuration**: Standard I2C (GPIO 21 SDA, GPIO 22 SCL)
+- **PWM Configuration**: 5kHz frequency, 8-bit resolution, PWM channel 0
+- **Distance Range**: 25mm (touch/minimum) to 1000mm (far/maximum)
+- **LED Brightness**: 3 (minimum) to 125 (max - 50% duty cycle)
+- **Fade Rate**: ±48 per loop = very fast response (~0.25 seconds full fade)
+- **Update Rate**: 50ms loop delay with smooth brightness transitions
+- **Sensor Mode**: Continuous reading mode for faster updates
 - **GPIO Pins**:
-  - I2C SDA: GPIO 21 (VL53L0X)
-  - I2C SCL: GPIO 22 (VL53L0X)
-  - LED #1 (VL53L0X): GPIO 25
-  - UART RX: GPIO 12 (LD2410C)
-  - UART TX: GPIO 14 (LD2410C)
-  - LED #2 (LD2410C): GPIO 26
-  - Servo Control: GPIO 27
-
-### Development Steps
-1. Initialize PlatformIO project for ESP32
-2. Configure I2C for VL53L0X communication
-3. Configure UART2 for LD2410C communication
-4. Implement VL53L0X distance reading and LED control
-5. Implement LD2410C data frame parsing
-6. Implement state machine with debounce logic for LD2410C
-7. Configure PWM outputs for both LEDs
-8. Configure servo control
-9. Implement smooth 5-second transitions for LD2410C system
-10. Test and calibrate both systems
+  - I2C SDA: GPIO 21 (VL53L0X sensor)
+  - I2C SCL: GPIO 22 (VL53L0X sensor)
+  - LED PWM: GPIO 25 (brightness control)
 
 ## Wiring Diagram
 
@@ -109,50 +81,22 @@ SDA       --->   GPIO 21 (SDA)
 SCL       --->   GPIO 22 (SCL)
 ```
 
-### LD2410C to TTGO T18
+### LED Connection
 ```
-LD2410C          TTGO T18
---------         --------
-VCC       --->   3.3V or 5V
-GND       --->   GND
-TX        --->   GPIO 12 (RX2)
-RX        --->   GPIO 14 (TX2)
-```
-
-### Servo Connection
-```
-TTGO T18         Servo
---------         -----
-GPIO 27   --->   Signal (PWM)
-5V        --->   VCC (Power)
-GND       --->   GND
-```
-
-### LED Connections
-```
-TTGO T18         LED #1 (VL53L0X)
---------         ----------------
+TTGO T18         LED
+--------         ---
 GPIO 25   --->   LED Anode (+ via resistor)
 GND       --->   LED Cathode (-)
-
-TTGO T18         LED #2 (LD2410C)
---------         ----------------
-GPIO 26   --->   LED Anode (+ via resistor)
-GND       --->   LED Cathode (-)
 ```
 
-**Note**: Use appropriate current-limiting resistor for your LEDs (typically 220Ω - 1kΩ for standard LEDs)
+**Note**: Use appropriate current-limiting resistor for your LED (typically 220Ω - 1kΩ for standard LEDs)
 
 ## Pin Configuration Summary
 | Component | Function | GPIO Pin |
 |-----------|----------|----------|
 | VL53L0X   | I2C SDA  | GPIO 21  |
 | VL53L0X   | I2C SCL  | GPIO 22  |
-| LED #1    | PWM Out (VL53L0X) | GPIO 25 |
-| LD2410C   | UART RX  | GPIO 12  |
-| LD2410C   | UART TX  | GPIO 14  |
-| LED #2    | PWM Out (LD2410C) | GPIO 26 |
-| Servo     | PWM Out  | GPIO 27  |
+| LED       | PWM Out  | GPIO 25  |
 
 ## Building and Uploading
 
@@ -177,26 +121,33 @@ pio run --target upload && pio device monitor
 
 ## Serial Monitor
 The project outputs debug information to Serial (USB) at 115200 baud rate showing:
-- **VL53L0X**: Distance in mm, LED #1 brightness (0-255)
-- **LD2410C**: Current state, presence status, distance in mm, LED #2 brightness (0-255), servo angle (0-180°)
+- **VL53L0X**: Distance in mm, LED brightness (3-125)
+- **Status updates**: Every 1 second
+- **Debug messages**: Significant brightness changes (>10 difference)
 
-## Future Enhancements
-- Add adjustable detection range via serial commands
-- Implement WiFi connectivity for remote monitoring
-- Add multiple detection zones with different behaviors
-- Battery level monitoring
-- Deep sleep mode for power saving
-- Add OLED display for local status display
-- Combine sensor data for advanced logic
+Example output:
+```
+=== TTGO T18 - VL53L0X Distance Sensor ===
+Initializing...
 
-## License
-This project is provided as-is for educational and development purposes.
+I2C initialized
+VL53L0X sensor... SUCCESS!
+VL53L0X LED PWM initialized on GPIO 25
+
+Setup complete! VL53L0X system active...
+
+--- Status ---
+VL53: 156 mm | LED: 45
+--- Status ---
+VL53: 89 mm | LED: 65
+[VL53 DEBUG] Distance: 45 mm | Current: 78 | Target: 115
+--- Status ---
+VL53: 45 mm | LED: 115
+```
 
 ## References
 - [VL53L0X Datasheet (ST)](https://www.st.com/resource/en/datasheet/vl53l0x.pdf)
 - [VL53L0X Amazon Product](https://www.amazon.com/dp/B0B1M79WMP)
-- [LD2410C Product Page](https://www.hlktech.net/index.php?id=1095)
 - [LILYGO T-Energy GitHub](https://github.com/LilyGO/LILYGO-T-Energy)
-- [ESP32Servo Library](https://github.com/madhephaestus/ESP32Servo)
-- [Adafruit VL53L0X Library](https://github.com/adafruit/Adafruit_VL53L0X)
+- [VL53L0X_mod Library (schnoog)](https://github.com/schnoog/vl53l0x-arduino-mod)
 - [PlatformIO ESP32 Documentation](https://docs.platformio.org/en/latest/platforms/espressif32.html)
