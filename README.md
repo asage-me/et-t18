@@ -132,7 +132,7 @@ GND       --->   GND
 GPIO 26   --->   DATA/OUT
 ```
 
-**Note**: IR receiver button code 0xFFA25D toggles sensor/LED. 2-second debounce between toggles.
+**Note**: IR receiver supports multiple button codes for mode selection and on/off toggle.
 
 ### Power Switch Connection
 ```
@@ -143,6 +143,45 @@ GND       --->   Switch Terminal 2
 ```
 
 **Note**: GPIO 27 has internal pullup resistor enabled. Switch open = deep sleep (HIGH), switch closed = normal operation (LOW).
+
+## Finger Schematics
+
+### VL53L0X Sensor Wiring
+```
+VL53L0X Pin      Wire Color    TTGO T18
+-----------      ----------    --------
+VCC              Orange        3.3V
+GND              White Orange  GND
+SDA              Blue          GPIO 21 (SDA)
+SCL              Green         GPIO 22 (SCL)
+```
+
+### LED Wiring
+```
+LED Terminal     Wire Color    TTGO T18
+------------     ----------    --------
+Anode (+)        Brown         GPIO 25 (via resistor)
+Cathode (-)      White Brown   GND
+```
+
+## IR/On-Off Box Wiring
+
+### VS1838B IR Receiver
+```
+VS1838B Pin      Wire Color    TTGO T18
+-----------      ----------    --------
+Signal           Green         GPIO 26
+GND              Black         GND
+VCC              Red           3.3V
+```
+
+### Power Switch
+```
+Switch Terminal  Wire Color    TTGO T18
+---------------  ----------    --------
+Signal           White         GPIO 27
+GND              Black         GND
+```
 
 ## Pin Configuration Summary
 | Component     | Function | GPIO Pin |
